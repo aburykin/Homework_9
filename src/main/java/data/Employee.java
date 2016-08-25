@@ -7,7 +7,7 @@ import java.io.Serializable;
  */
 
 // тип записей в базе данных - работник.
-public class Employee implements Serializable{
+public class Employee implements Serializable {
 
     private String name;
     private int age;

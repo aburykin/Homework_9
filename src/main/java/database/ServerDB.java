@@ -1,6 +1,7 @@
 package database;
 
 import annotations.Cache;
+import data.CacheType;
 import data.Employee;
 
 import java.util.Date;
@@ -13,17 +14,19 @@ import java.util.List;
 
 public interface ServerDB {
 
-    @Cache(zip = true, fileName = "last_backup")
+    @Cache(zip = true, fileName = "last_backup", listSize = 4) //+
     List<Employee> runBackup();
 
-    @Cache(cacheType = Cache.CacheType.FILE, fileName = "testFile_getOnlyFemale", listSize = 2)  //(cacheType = Cache.CacheType.FILE , zip=true) //
+    @Cache(cacheType = CacheType.FILE, fileName = "female.ser", listSize = 2) //+
     List<Employee> getOnlyFemale();
 
-    @Cache(cacheType = Cache.CacheType.JVM)
+    @Cache(cacheType = CacheType.JVM) //+
     List<Employee> getOnlyMale();
 
-    List<Employee> getOnlyRichEmployee(int salary); // for example: salary >= 100_000
+    @Cache(cacheType = CacheType.JVM, listSize = 1) //+
+    List<Employee> getOnlyRichEmployee(int salary);
 
+    @Cache(ignoreParams = {String.class, Boolean.class})
     List<Employee> select(String name, int age, boolean gender, double salary);
 
 }

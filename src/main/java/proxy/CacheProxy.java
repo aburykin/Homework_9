@@ -1,13 +1,21 @@
 package proxy;
 
 import annotations.Cache;
+import data.CacheType;
 import data.Employee;
 
 import java.io.*;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import static java.lang.ClassLoader.getSystemClassLoader;
@@ -20,17 +28,13 @@ public class CacheProxy implements InvocationHandler {
     private final Object realServiceDBImpl;
     String rootDirectory;
 
-    ArrayList<Employee> jvmCache = null;
+    Map<String, ArrayList> jvmCache = new HashMap<String, ArrayList>();
 
-
-    public CacheProxy(Object realServiceDBImpl, String rootDirectory) { // , String[] cachePropertiesDefault
-        this.realServiceDBImpl = realServiceDBImpl;
+    public CacheProxy(Object delegate, String rootDirectory) {
+        this.realServiceDBImpl = delegate;
         this.rootDirectory = rootDirectory;
-
-
     }
 
-    // возвращает динамический прокси
     public static <T> T cache(Object delegate, String rootDirectory) {
         return (T) Proxy.newProxyInstance(getSystemClassLoader(),
                 delegate.getClass().getInterfaces(),
@@ -40,97 +44,93 @@ public class CacheProxy implements InvocationHandler {
 
     // перехватчик методов
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        System.out.println("\nCacheProxy перехватил вызов метода: " + method.getName()); // runService
-        Method currMethod = method;
-        Cache cacheAnnotaion =  currMethod.getAnnotation(Cache.class); //currMethod.getClass().getAnnotation(Cache.class);
-
-        Object result = null;
-        if (cacheAnnotaion != null) {  // значит метод нужно кэшировать
-            // получаю параметры кэша
-            System.out.println("\nПараметры кэша:");
-            Cache.CacheType cacheType = cacheAnnotaion.cacheType();
-           // int[] ignoreParams = cacheAnnotaion.ignoreParams();
-            int listSize = cacheAnnotaion.listSize();
-            String fileName = "UseMethodName".equals(cacheAnnotaion.fileName())?currMethod.getName():cacheAnnotaion.fileName();
-            boolean zip = cacheAnnotaion.zip();
-
-            System.out.println("cacheAnnotaion = " + cacheType);
-            System.out.println("zip = " + zip);
-            System.out.println("fileName = " + fileName);
-
-           // System.out.println("ignoreParams = " + ignoreParams);
-            System.out.println("listSize = " + listSize);
-
-
-
-            if (cacheType == Cache.CacheType.FILE)
-            {
-                String checkFile = rootDirectory + fileName + (zip?".zip":"");
-                // ищу файл в кэше
-                if (checkCache(checkFile)){
-                  //  ZipOutputStream
-                    result =  getSerializationResult( fileName,  zip,  rootDirectory);
-                }
-                else // нет сериализованного метода
-                {
-                    result = method.invoke(realServiceDBImpl, args); // выполнить реальный метод
-                    setSerializationResult( (ArrayList<Employee>)result,   fileName,  listSize,  zip,  rootDirectory);
-                }
-
-            }
-            else if (cacheType == Cache.CacheType.JVM)
-            {
-
-            }
-
-           // result = invokeCachedMethod(currMethod, cacheAnnotaion);
-        } else {
-            result = method.invoke(realServiceDBImpl, args); // выполнить реальный метод
-        }
-        System.out.println("CacheProxy завершил метод: " + method.getName());
+        System.out.println("\nCacheProxy перехватил вызов метода: " + method.getName()+"  ------------------------------------------------------------------------------------------");
+        Cache cacheAnnotaion = method.getAnnotation(Cache.class);
+        Object result = invokeCachedMethod(method, args, cacheAnnotaion);
+        System.out.println("\nCacheProxy завершил метод: " + method.getName());
         return result;
+    }
+
+    private Object invokeCachedMethod(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
+        Object result = null;
+        if (cacheAnnotaion != null) {
+            showCacheParams(cacheAnnotaion, method);
+
+            CacheType cacheType = cacheAnnotaion.cacheType();
+            if (cacheType == CacheType.FILE) {
+                result = getCachedFile(method, args, cacheAnnotaion);
+            } else if (cacheType == CacheType.JVM) {
+                result = getSavingResaultFromJVM(method, args, cacheAnnotaion);
+                // result = method.invoke(realServiceDBImpl, args);// загрулшка
+            }
+        } else {
+            result = method.invoke(realServiceDBImpl, args);
+        }
+        return result;
+    }
+
+    private Object getCachedFile(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
+        String fileName = getCacheFileName(cacheAnnotaion, method);
+        boolean zip = cacheAnnotaion.zip();
+        int listSize = cacheAnnotaion.listSize();
+
+        Object result;
+        if (checkCacheFile(rootDirectory + fileName + (zip ? ".zip" : ""))) {
+            result = getSerializationResult(fileName, zip, rootDirectory);
+        } else {
+            result = method.invoke(realServiceDBImpl, args);
+            setSerializationResult((ArrayList<Employee>) result, fileName, listSize, zip, rootDirectory);
+        }
+        return result;
+    }
+
+    private void showCacheParams(Cache cacheAnnotaion, Method method){
+        System.out.println("\nПараметры кэша:");
+        System.out.println("cacheAnnotaion = " + cacheAnnotaion.cacheType());
+        System.out.println("zip = " + cacheAnnotaion.zip());
+        System.out.println("fileName = " + getCacheFileName(cacheAnnotaion, method));
+        System.out.println("listSize = " + cacheAnnotaion.listSize());
+
+        Class[] classes = cacheAnnotaion.ignoreParams();
+        String listClasses = "";
+        for (Class x : classes) listClasses += x+",";
+
+        System.out.println("ignoreParams = " + listClasses+"\n");
+    }
+
+
+
+    private String getCacheFileName(Cache cacheAnnotaion, Method method) {
+        return "".equals(cacheAnnotaion.fileName()) ? method.getName() : cacheAnnotaion.fileName();
+    }
+
+    private boolean checkCacheFile(String checkFile) {
+        File file = new File(checkFile);
+        return file.exists();
 
     }
 
-    // true если файл найден
-    private boolean checkCache(String checkFile){
-             File file = new File(checkFile);
-             System.out.println( checkFile + " exists = " + file.exists());
-             return file.exists();
-     }
+    private void setSerializationResult(ArrayList<Employee> result, String fileName, int listSize, boolean zip, String rootDirectory) {
+        ArrayList<Employee> saveObject = createSavingResult(result, listSize);
 
-    private void setSerializationResult(ArrayList<Employee> result,  String fileName, int listSize, boolean zip, String rootDirectory){
-
-        // создаю кэшированный объект
-        ArrayList<Employee> saveObject = new  ArrayList<Employee>();
-        if (listSize == -1) saveObject = result;
-        else {
-            for (Employee employee : result) {
-
-                if (listSize == 0) break;
-                listSize--;
-                saveObject.add(employee);
-            }
-        }
-
-        // кэширую
         try {
             FileOutputStream fos;
-            if (zip){
-                    System.out.println("Кэширую результат в "+ fileName+".zip");
-                    fos = new FileOutputStream( new File(rootDirectory+fileName+".zip"));
-                    ZipOutputStream zos = new ZipOutputStream(fos);
-                    ObjectOutputStream oos = new ObjectOutputStream(zos);
-                    oos.writeObject(saveObject);
-                    oos.flush();
-                    oos.close();
-            } else { // сохранил объект в файл
-                    System.out.println("Кэширую результат в "+ fileName);
-                    fos = new FileOutputStream( new File(rootDirectory+fileName));
-                    ObjectOutputStream oos = new ObjectOutputStream(fos);
-                    oos.writeObject(saveObject);
-                    oos.flush();
-                    oos.close();
+            if (zip) {
+                fileName += ".zip";
+                System.out.println("Кэширую результат в " + fileName);
+                fos = new FileOutputStream(new File(rootDirectory + fileName));
+                GZIPOutputStream  zip_os = new GZIPOutputStream(fos);
+                ObjectOutputStream oos = new ObjectOutputStream(zip_os);
+                oos.writeObject(saveObject);
+                oos.flush();
+                oos.close();
+            } else {
+                System.out.println("Кэширую результат в " + fileName);
+                fos = new FileOutputStream(new File(rootDirectory + fileName));
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                oos.writeObject(saveObject);
+                oos.flush();
+                oos.close();
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -139,27 +139,41 @@ public class CacheProxy implements InvocationHandler {
         }
     }
 
-    private ArrayList<Employee> getSerializationResult(String fileName, boolean zip, String rootDirectory){
+    private ArrayList<Employee> createSavingResult(ArrayList<Employee> result, int listSize) {
+        ArrayList<Employee> saveObject = new ArrayList<Employee>();
+        if (listSize == -1) saveObject = result;
+        else {
+            for (Employee employee : result) {
+                if (listSize == 0) break;
+                listSize--;
+                saveObject.add(employee);
+            }
+        }
+        return saveObject;
+    }
+
+    private ArrayList<Employee> getSerializationResult(String fileName, boolean zip, String rootDirectory) {
 
         ArrayList<Employee> result = new ArrayList<Employee>();
-        String file = rootDirectory+fileName;
+        String file = rootDirectory + fileName;
 
         try {
-            if (zip){
-                System.out.println("Получаю результат из "+ rootDirectory+fileName+".zip");
-
-
-            }
-            else {
-                System.out.println("Получаю результат из "+ rootDirectory+fileName);
+            if (zip) {
+                file +=".zip";
+                System.out.println("Получаю результат из " + file);
+                FileInputStream fis = new FileInputStream(file);
+                GZIPInputStream zip_is = new GZIPInputStream(fis);
+                ObjectInputStream oin = new ObjectInputStream(zip_is);
+                result = (ArrayList<Employee>) oin.readObject();
+            } else {
+                System.out.println("Получаю результат из " + file);
                 FileInputStream fis = new FileInputStream(file);
                 ObjectInputStream oin = new ObjectInputStream(fis);
-                result = ( ArrayList<Employee>) oin.readObject();
+                result = (ArrayList<Employee>) oin.readObject();
             }
         } catch (FileNotFoundException e) {
             e.printStackTrace();
-        }
-            catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -169,8 +183,32 @@ public class CacheProxy implements InvocationHandler {
     }
 
 
-    private void saveResultInJVM(){}
 
+    private Object getSavingResaultFromJVM(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
+        String fileName = getCacheFileName(cacheAnnotaion, method);
+        int listSize = cacheAnnotaion.listSize();
+
+        Object result;
+        if (checkJVMCache(fileName)) {
+            result = getResultFromJVM(fileName);
+        } else {
+            result = method.invoke(realServiceDBImpl, args);
+            saveResultInJVM((ArrayList<Employee>) result, fileName, listSize);
+        }
+        return result;
+    }
+
+    private boolean checkJVMCache(String fileName){
+        return jvmCache.get(fileName) == null? false : true;
+    }
+
+    private void saveResultInJVM(ArrayList<Employee> result, String fileName, int listSize) {
+        jvmCache.put(fileName, createSavingResult( result,  listSize));
+    }
+
+    private ArrayList getResultFromJVM(String fileName) {
+        return jvmCache.get(fileName);
+    }
 
 
 }
