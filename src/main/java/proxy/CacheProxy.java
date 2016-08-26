@@ -71,6 +71,7 @@ public class CacheProxy implements InvocationHandler {
 
     private Object getCachedFile(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
         String fileName = getCacheFileName(cacheAnnotaion, method);
+        fileName = addIgnoreParamsToFilename(args, cacheAnnotaion, fileName);
         boolean zip = cacheAnnotaion.zip();
         int listSize = cacheAnnotaion.listSize();
 
@@ -187,6 +188,7 @@ public class CacheProxy implements InvocationHandler {
     private Object getSavingResaultFromJVM(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
         String fileName = getCacheFileName(cacheAnnotaion, method);
         int listSize = cacheAnnotaion.listSize();
+        fileName = addIgnoreParamsToFilename(args, cacheAnnotaion, fileName);
 
         Object result;
         if (checkJVMCache(fileName)) {
@@ -196,6 +198,20 @@ public class CacheProxy implements InvocationHandler {
             saveResultInJVM((ArrayList<Employee>) result, fileName, listSize);
         }
         return result;
+    }
+
+    private String addIgnoreParamsToFilename(Object[] args, Cache cacheAnnotaion, String fileName) {
+        for (Object arg : args) {
+            boolean contains = false;
+            for (Class aClass : cacheAnnotaion.ignoreParams()) {
+              if (arg.getClass() == aClass) {
+                  contains = true;
+              }
+            }
+           if (!contains) fileName += "_"+arg;
+        }
+       // System.out.println("!! fileName = " + fileName);
+        return fileName;
     }
 
     private boolean checkJVMCache(String fileName){

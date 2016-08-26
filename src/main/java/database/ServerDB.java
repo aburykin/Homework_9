@@ -14,19 +14,19 @@ import java.util.List;
 
 public interface ServerDB {
 
-    @Cache(zip = true, fileName = "last_backup", listSize = 4) //+
+    @Cache(zip = true, fileName = "last_backup", listSize = 4)
     List<Employee> runBackup();
 
-    @Cache(cacheType = CacheType.FILE, fileName = "female.ser", listSize = 2) //+
+    @Cache(cacheType = CacheType.FILE, fileName = "female.ser", listSize = 2)
     List<Employee> getOnlyFemale();
 
-    @Cache(cacheType = CacheType.JVM) //+
+    @Cache(cacheType = CacheType.JVM)
     List<Employee> getOnlyMale();
 
-    @Cache(cacheType = CacheType.JVM, listSize = 1) //+
+    @Cache(cacheType = CacheType.JVM, listSize = 1)
     List<Employee> getOnlyRichEmployee(int salary);
 
-    @Cache(ignoreParams = {String.class, Boolean.class})
+    @Cache(cacheType = CacheType.JVM, ignoreParams = {String.class, Boolean.class})
     List<Employee> select(String name, int age, boolean gender, double salary);
 
 }
