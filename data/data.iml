@@ -13,7 +13,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="proxy" />
     <orderEntry type="module" module-name="database" />
-    <orderEntry type="module" module-name="data" />
     <orderEntry type="module" module-name="annotations" />
   </component>
 </module>

@@ -1,6 +1,5 @@
 package database;
 
-import annotations.Cache;
 import data.Employee;
 
 import java.util.ArrayList;
@@ -14,7 +13,7 @@ public class ServerDBImpl implements ServerDB {
     ArrayList<Employee> people;
 
     public ServerDBImpl() {
-        this.people = new ArrayList<Employee>();
+        this.people = new ArrayList();
         createData();
     }
 

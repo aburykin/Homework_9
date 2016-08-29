@@ -3,7 +3,6 @@ package proxy;
 import annotations.Cache;
 import data.CacheType;
 import data.Employee;
-
 import java.io.*;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -11,12 +10,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
 import static java.lang.ClassLoader.getSystemClassLoader;
 
@@ -44,7 +40,7 @@ public class CacheProxy implements InvocationHandler {
 
     // перехватчик методов
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        System.out.println("\nCacheProxy перехватил вызов метода: " + method.getName()+"  ------------------------------------------------------------------------------------------");
+        System.out.println("\nCacheProxy перехватил вызов метода: " + method.getName() + "  ------------------------------------------------------------------------------------------");
         Cache cacheAnnotaion = method.getAnnotation(Cache.class);
         Object result = invokeCachedMethod(method, args, cacheAnnotaion);
         System.out.println("\nCacheProxy завершил метод: " + method.getName());
@@ -61,7 +57,6 @@ public class CacheProxy implements InvocationHandler {
                 result = getCachedFile(method, args, cacheAnnotaion);
             } else if (cacheType == CacheType.JVM) {
                 result = getSavingResaultFromJVM(method, args, cacheAnnotaion);
-                // result = method.invoke(realServiceDBImpl, args);// загрулшка
             }
         } else {
             result = method.invoke(realServiceDBImpl, args);
@@ -85,7 +80,7 @@ public class CacheProxy implements InvocationHandler {
         return result;
     }
 
-    private void showCacheParams(Cache cacheAnnotaion, Method method){
+    private void showCacheParams(Cache cacheAnnotaion, Method method) {
         System.out.println("\nПараметры кэша:");
         System.out.println("cacheAnnotaion = " + cacheAnnotaion.cacheType());
         System.out.println("zip = " + cacheAnnotaion.zip());
@@ -94,11 +89,10 @@ public class CacheProxy implements InvocationHandler {
 
         Class[] classes = cacheAnnotaion.ignoreParams();
         String listClasses = "";
-        for (Class x : classes) listClasses += x+",";
+        for (Class x : classes) listClasses += x + ",";
 
-        System.out.println("ignoreParams = " + listClasses+"\n");
+        System.out.println("ignoreParams = " + listClasses + "\n");
     }
-
 
 
     private String getCacheFileName(Cache cacheAnnotaion, Method method) {
@@ -120,7 +114,7 @@ public class CacheProxy implements InvocationHandler {
                 fileName += ".zip";
                 System.out.println("Кэширую результат в " + fileName);
                 fos = new FileOutputStream(new File(rootDirectory + fileName));
-                GZIPOutputStream  zip_os = new GZIPOutputStream(fos);
+                GZIPOutputStream zip_os = new GZIPOutputStream(fos);
                 ObjectOutputStream oos = new ObjectOutputStream(zip_os);
                 oos.writeObject(saveObject);
                 oos.flush();
@@ -160,7 +154,7 @@ public class CacheProxy implements InvocationHandler {
 
         try {
             if (zip) {
-                file +=".zip";
+                file += ".zip";
                 System.out.println("Получаю результат из " + file);
                 FileInputStream fis = new FileInputStream(file);
                 GZIPInputStream zip_is = new GZIPInputStream(fis);
@@ -184,7 +178,6 @@ public class CacheProxy implements InvocationHandler {
     }
 
 
-
     private Object getSavingResaultFromJVM(Method method, Object[] args, Cache cacheAnnotaion) throws IllegalAccessException, InvocationTargetException {
         String fileName = getCacheFileName(cacheAnnotaion, method);
         int listSize = cacheAnnotaion.listSize();
@@ -204,22 +197,21 @@ public class CacheProxy implements InvocationHandler {
         for (Object arg : args) {
             boolean contains = false;
             for (Class aClass : cacheAnnotaion.ignoreParams()) {
-              if (arg.getClass() == aClass) {
-                  contains = true;
-              }
+                if (arg.getClass() == aClass) {
+                    contains = true;
+                }
             }
-           if (!contains) fileName += "_"+arg;
+            if (!contains) fileName += "_" + arg;
         }
-       // System.out.println("!! fileName = " + fileName);
         return fileName;
     }
 
-    private boolean checkJVMCache(String fileName){
-        return jvmCache.get(fileName) == null? false : true;
+    private boolean checkJVMCache(String fileName) {
+        return jvmCache.get(fileName) == null ? false : true;
     }
 
     private void saveResultInJVM(ArrayList<Employee> result, String fileName, int listSize) {
-        jvmCache.put(fileName, createSavingResult( result,  listSize));
+        jvmCache.put(fileName, createSavingResult(result, listSize));
     }
 
     private ArrayList getResultFromJVM(String fileName) {

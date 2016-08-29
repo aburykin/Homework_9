@@ -22,11 +22,18 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="true" />
-        <module name="Homework_9" />
+        <module name="annotations" />
+        <module name="data" />
+        <module name="database" />
+        <module name="proxy" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="Homework_9" target="1.5" />
+      <module name="annotations" target="1.8" />
+      <module name="data" target="1.8" />
+      <module name="database" target="1.8" />
+      <module name="Homework_9" target="1.8" />
+      <module name="proxy" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>
