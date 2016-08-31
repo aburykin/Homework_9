@@ -75,7 +75,11 @@ public class CacheProxy implements InvocationHandler {
             result = getSerializationResult(fileName, zip, rootDirectory);
         } else {
             result = method.invoke(realServiceDBImpl, args);
-            setSerializationResult((ArrayList<Employee>) result, fileName, listSize, zip, rootDirectory);
+            try {
+                setSerializationResult((ArrayList<Employee>) result, fileName, listSize, zip, rootDirectory);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
         }
         return result;
     }
@@ -105,7 +109,7 @@ public class CacheProxy implements InvocationHandler {
 
     }
 
-    private void setSerializationResult(ArrayList<Employee> result, String fileName, int listSize, boolean zip, String rootDirectory) {
+    private void setSerializationResult(ArrayList<Employee> result, String fileName, int listSize, boolean zip, String rootDirectory) throws FileNotFoundException {
         ArrayList<Employee> saveObject = createSavingResult(result, listSize);
 
         try {
@@ -128,7 +132,7 @@ public class CacheProxy implements InvocationHandler {
                 oos.close();
             }
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+             throw new  FileNotFoundException("В директориии " + rootDirectory  + "не найден файл " + fileName);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -194,6 +198,8 @@ public class CacheProxy implements InvocationHandler {
     }
 
     private String addIgnoreParamsToFilename(Object[] args, Cache cacheAnnotaion, String fileName) {
+        if (args == null) return fileName;
+
         for (Object arg : args) {
             boolean contains = false;
             for (Class aClass : cacheAnnotaion.ignoreParams()) {
@@ -203,6 +209,7 @@ public class CacheProxy implements InvocationHandler {
             }
             if (!contains) fileName += "_" + arg;
         }
+
         return fileName;
     }
 

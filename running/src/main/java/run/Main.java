@@ -10,7 +10,7 @@ import proxy.CacheProxy;
  */
 public class Main {
     public static void main(String[] args) throws NoSuchMethodException {
-        String rootDir = System.getProperty("user.dir") + "/src/main/resources/cache_results/";
+        String rootDir = System.getProperty("user.dir") + "/running/src/main/resources/cache_results/";
         System.out.println("rootDir = " + rootDir);
 
         ServerDB proxyDB = CacheProxy.cache(new ServerDBImpl(),rootDir);
